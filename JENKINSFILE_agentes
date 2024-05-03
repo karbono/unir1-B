@@ -1,0 +1,58 @@
+pipeline {
+    agent none
+    stages {
+        stage('Get Code') {
+            agent { label 'principal' }
+            steps {
+                git 'https://github.com/karbono/unir1-a.git'
+            }
+        }
+        stage('Build') {
+            agent { label 'principal' }
+            steps {
+                dir('C:\\Users\\lacei\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\P24\\Caso1.A'){
+                    stash (name: 'testStashed')
+                }
+                echo 'Eyy esto es Python, nada que compilar!'
+                echo WORKSPACE
+                bat 'dir'
+            }
+        }
+        stage('Tests') {
+            parallel {
+                stage('Unit') {
+                    agent { label 'unit' }
+                    steps {
+                        unstash 'testStashed'
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            bat '''
+					            whoami
+					            cd
+                                SET FLASK_APP=%WORKSPACE%\\app\\api.py
+                                start flask run
+                                set PYTHONPATH=%WORKSPACE%
+                                pytest --junitxml=%WORKSPACE%\\result-unit.xml %WORKSPACE%\\test\\unit
+                            '''
+                        }
+                    }
+                }
+                stage('Rest') {
+                    agent { label 'rest' }
+                    steps {
+                        unstash 'testStashed'
+                        bat '''
+                            whoami
+                            cd
+                            SET FLASK_APP=%WORKSPACE%\\app\\api.py
+                            start flask run
+                            SET PYTHONPATH=%WORKSPACE%
+                            start java -jar %WORKSPACE%\\wiremock-standalone-3.5.3.jar --port 9090 --root-dir %WORKSPACE%\\test\\wiremock
+                            pytest --junitxml=%WORKSPACE%\\result-rest.xml %WORKSPACE%\\test\\rest
+                            exit
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}   
