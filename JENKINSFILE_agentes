@@ -14,7 +14,7 @@ pipeline {
                     stash (name: 'testStashed')
                 }
                 echo 'Eyy esto es Python, nada que compilar!'
-                echo ${WORKSPACE}
+                echo WORKSPACE
                 bat '''
 			dir
 			whoami
@@ -31,6 +31,7 @@ pipeline {
                         }
                         unstash 'testStashed'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+			    echo WORKSPACE
                             bat '''
 			        whoami
 				cd
@@ -49,7 +50,7 @@ pipeline {
                             stash (name: 'restResult')
                         }
                         unstash 'testStashed'
-			echo ${WORKSPACE}
+			echo WORKSPACE
                         bat '''
                             whoami
                             cd
