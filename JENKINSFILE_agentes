@@ -23,6 +23,9 @@ pipeline {
                 stage('Unit') {
                     agent { label 'unit' }
                     steps {
+                        dir('C:\\Users\\lacei\\Documents\\AgentesJenkins\\Agent1\\workspace\\P24\\Caso1.A'){
+                            stash (name: 'unitResult')
+                        }
                         unstash 'testStashed'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                             bat '''
@@ -39,6 +42,9 @@ pipeline {
                 stage('Rest') {
                     agent { label 'rest' }
                     steps {
+                        dir('C:\\Users\\lacei\\Documents\\AgentesJenkins\\Agent2\\workspace\\P24\\Caso1.A'){
+                            stash (name: 'restResult')
+                        }
                         unstash 'testStashed'
                         bat '''
                             whoami
@@ -51,6 +57,19 @@ pipeline {
                             exit
                         '''
                     }
+                }
+            }
+        }
+        stage('Results') {
+            agent { label 'principal' }
+            steps {
+                unstash 'unitResult'
+                unstash 'restResult'
+                dir('C:\\Users\\lacei\\Documents\\AgentesJenkins\\Agent2\\workspace\\P24\\Caso1.A'){
+                    junit testResults: 'result*.xml'
+                }
+                dir('C:\\Users\\lacei\\Documents\\AgentesJenkins\\Agent1\\workspace\\P24\\Caso1.A'){
+                    junit testResults: 'result*.xml'
                 }
             }
         }
