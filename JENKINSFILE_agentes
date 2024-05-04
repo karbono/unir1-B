@@ -14,8 +14,11 @@ pipeline {
                     stash (name: 'testStashed')
                 }
                 echo 'Eyy esto es Python, nada que compilar!'
-                echo WORKSPACE
-                bat 'dir'
+                echo ${WORKSPACE}
+                bat '''
+			dir
+			whoami
+		'''
             }
         }
         stage('Tests') {
@@ -29,8 +32,8 @@ pipeline {
                         unstash 'testStashed'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                             bat '''
-					            whoami
-					            cd
+			        whoami
+				cd
                                 SET FLASK_APP=%WORKSPACE%\\app\\api.py
                                 start flask run
                                 set PYTHONPATH=%WORKSPACE%
@@ -46,6 +49,7 @@ pipeline {
                             stash (name: 'restResult')
                         }
                         unstash 'testStashed'
+			echo ${WORKSPACE}
                         bat '''
                             whoami
                             cd
