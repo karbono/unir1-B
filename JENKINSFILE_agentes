@@ -1,82 +1,114 @@
 pipeline {
-    agent none
+    agent any
     stages {
         stage('Get Code') {
-            agent { label 'principal' }
+            agent { label 'principal'}
             steps {
-                git 'https://github.com/karbono/unir1-a.git'
-            }
-        }
-        stage('Build') {
-            agent { label 'principal' }
-            steps {
-                dir('C:\\Users\\lacei\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\P24\\Caso1.A'){
-                    stash (name: 'testStashed')
+                git 'https://github.com/karbono/unir1-B'
+                dir('C:\\Users\\lacei\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\P24\\Caso1B'){
+                    stash (name: 'sourceCode')
                 }
-                echo 'Eyy esto es Python, nada que compilar!'
-                echo WORKSPACE
+                stash name: 'flaskJMX', includes: 'test\\jmeter\\flask.jmx'
                 bat '''
-			dir
-			whoami
-		'''
+                    whoami
+                    dir
+                    hostname
+                '''
             }
         }
-        stage('Tests') {
+        stage('ParallelTests'){
             parallel {
-                stage('Unit') {
-                    agent { label 'unit' }
+                stage('Cobertura') {
+                    agent { label 'testing1'}
                     steps {
-                        dir('C:\\Users\\lacei\\Documents\\AgentesJenkins\\Agent1\\workspace\\P24\\Caso1.A'){
-                            stash (name: 'unitResult')
-                        }
-                        unstash 'testStashed'
+                        unstash 'sourceCode'
+                        bat '''
+                            whoami
+                            dir
+                            hostname
+                            SET PYTHONPATH=%WORKSPACE%
+                            coverage run --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest --junitxml=result-unit.xml test\\unit
+                            coverage xml
+                        '''
+                        junit 'result-unit.xml'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-			    echo WORKSPACE
-                            bat '''
-			        whoami
-				cd
-                                SET FLASK_APP=%WORKSPACE%\\app\\api.py
-                                start flask run
-                                set PYTHONPATH=%WORKSPACE%
-                                pytest --junitxml=%WORKSPACE%\\result-unit.xml %WORKSPACE%\\test\\unit
-                            '''
+                            cobertura coberturaReportFile: 'coverage.xml', onlyStable: false, failUnstable: false, 
+                                conditionalCoverageTargets: '100,80,90', lineCoverageTargets: '100,85,95'
                         }
                     }
                 }
                 stage('Rest') {
-                    agent { label 'rest' }
+                    agent { label 'testing2'}
                     steps {
-                        dir('C:\\Users\\lacei\\Documents\\AgentesJenkins\\Agent2\\workspace\\P24\\Caso1.A'){
-                            stash (name: 'restResult')
-                        }
-                        unstash 'testStashed'
-			echo WORKSPACE
+                        unstash 'sourceCode'
                         bat '''
                             whoami
-                            cd
-                            SET FLASK_APP=%WORKSPACE%\\app\\api.py
-                            start flask run
+                            dir
+                            hostname
                             SET PYTHONPATH=%WORKSPACE%
-                            start java -jar %WORKSPACE%\\wiremock-standalone-3.5.3.jar --port 9090 --root-dir %WORKSPACE%\\test\\wiremock
-                            pytest --junitxml=%WORKSPACE%\\result-rest.xml %WORKSPACE%\\test\\rest
-                            exit
+                            set FLASK_APP=app\\api.py
+                            start /B flask run
+                            start /B /wait timeout 5
+                            start /B java -jar C:\\Users\\lacei\\Downloads\\wiremock-standalone-3.5.3.jar --port 9090 --root-dir test\\wiremock
+                            start /B /wait timeout 5
+                            pytest --junitxml=result-rest.xml test/rest
                         '''
+                        }
+                    }
+                stage('Static') {
+                    agent { label 'principal'}
+                    steps {
+                        bat '''
+                            whoami
+                            dir
+                            hostname
+                            flake8 --exit-zero --format=pylint app > flake8.out
+                        '''
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            recordIssues(
+                                tools: [flake8(name: 'Flake8', pattern: 'flake8.out')],
+                                qualityGates: [
+                                    [threshold: 8, type: 'TOTAL', unstable: true],
+                                    [threshold: 10, type: 'TOTAL', unhealthy: true]
+                                ]
+                            )
+                        }
                     }
                 }
-            }
-        }
-        stage('Results') {
-            agent { label 'principal' }
-            steps {
-                unstash 'unitResult'
-                unstash 'restResult'
-                dir('C:\\Users\\lacei\\Documents\\AgentesJenkins\\Agent2\\workspace\\P24\\Caso1.A'){
-                    junit testResults: 'result*.xml'
+                stage('Security') {
+                    agent { label 'testing1'}
+                    steps {
+                        bat '''
+                            whoami
+                            dir
+                            hostname
+                            bandit --exit-zero -r . -f custom -o bandit.out --severity-level medium --msg-template "{abspath}:{line}: [{test_id}] {msg}"
+                        '''
+                        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                            recordIssues(
+                                tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')],
+                                qualityGates: [
+                                    [threshold: 2, type: 'TOTAL', unstable: true],
+                                    [threshold: 4, type: 'TOTAL', unhealthy: true]
+                                ]
+                            )
+                        }
+                    }
                 }
-                dir('C:\\Users\\lacei\\Documents\\AgentesJenkins\\Agent1\\workspace\\P24\\Caso1.A'){
-                    junit testResults: 'result*.xml'
+                stage('Performance') {
+                    agent { label 'testing2'}
+                    steps {
+                        unstash 'sourceCode'
+                        bat '''
+                            whoami
+                            dir
+                            hostname
+                            C:\\Users\\lacei\\Downloads\\apache-jmeter-5.6.3\\bin\\jmeter -n -t test\\jmeter\\flask.jmx -f -l flask.jtl' 
+                        '''
+                            perfReport sourceDataFiles: 'flask.jtl'
+                    }
                 }
-            }
+            }    
         }
     }
-}   
+}
