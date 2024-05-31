@@ -5,7 +5,7 @@ pipeline {
             agent { label 'principal'}
             steps {
                 git 'https://github.com/karbono/unir1-B'
-                dir('C:\\Users\\lacei\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\P24\\Caso1B'){
+                dir('C:\\Users\\lacei\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\P24\\1B'){
                     stash (name: 'sourceCode')
                 }
                 stash name: 'flaskJMX', includes: 'test\\jmeter\\flask.jmx'
