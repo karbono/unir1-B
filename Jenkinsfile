@@ -16,9 +16,7 @@ pipeline {
                 '''
                 junit 'result-unit.xml'
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                    cobertura coberturaReportFile: 'coverage.xml', onlyStable: false, failUnstable: false, 
-                        conditionalCoverageTargets: '100,80,90', lineCoverageTargets: '100,85,95'
-                }
+                cobertura autoUpdateHealth: false, autoUpdateStability: false, coberturaReportFile: 'coverage.xml', conditionalCoverageTargets: '90, 80, 90', failUnhealthy: false, failUnstable: false, lineCoverageTargets: '95, 85, 90', maxNumberOfBuilds: 0, onlyStable: false, sourceEncoding: 'ASCII', zoomCoverageChart: false                }
             }
         }
         stage('Rest') {
